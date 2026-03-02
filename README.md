@@ -1,90 +1,120 @@
-# Security Alarm System with Alerts Using Arduino 🚨
+# Smart Home Security System 🚨
 
 ![Arduino](https://img.shields.io/badge/Hardware-Arduino_Uno-blue)
 ![Python](https://img.shields.io/badge/Software-Python_3.x-yellow)
+![Telegram](https://img.shields.io/badge/Alerts-Telegram_Bot-2CA5E0)
 ![IoT](https://img.shields.io/badge/Tech-IoT_Security-green)
 
 ## 📖 Abstract
-This project is a cost-effective, real-time security alarm system designed to detect unauthorized intrusions and monitor environmental conditions. It integrates an **Arduino Uno** with ultrasonic, PIR, and temperature sensors to detect motion, proximity breaches, and temperature anomalies.
+A real-time, low-cost smart security system built on **Arduino Uno** that monitors motion, proximity, temperature, and humidity. On detecting a threat, it triggers a local **buzzer** and simultaneously sends **instant notifications to a Telegram Bot** via a Python bridge script — keeping you informed from anywhere.
 
-Upon detecting a threat, the system triggers a local **buzzer** and simultaneously sends **instant alerts to a Telegram Bot** via a Python script. This dual-alert mechanism ensures users are notified immediately, regardless of their location, bridging the gap between embedded systems and modern IoT communication.
+---
 
-## ✨ Key Features
-* **Motion Detection:** Uses a PIR sensor to detect human movement within a specific range.
-* **Proximity Alert:** Uses an Ultrasonic sensor (HC-SR04) to detect objects within a critical distance (e.g., <10 cm).
-* **Environmental Monitoring:** Integrated DHT11 sensor monitors ambient temperature and humidity to detect anomalies (e.g., fire hazards).
-* **Real-Time Remote Alerts:** Sends instant notifications to the user's smartphone via the **Telegram App** using a Python-based serial interface.
-* **Local Alarm:** Activates an active buzzer immediately upon detection for on-site deterrence.
+## ✨ Features
+| Feature | Sensor | Threshold |
+|---|---|---|
+| **Motion Detection** | PIR (HC-SR501) | Any movement |
+| **Proximity Alert** | Ultrasonic (HC-SR04) | Object < 10 cm |
+| **High Temperature Warning** | DHT11 | Temp > 33 °C |
+| **Humidity Monitoring** | DHT11 | Continuous |
+| **Real-Time Telegram Alerts** | — | All events |
+| **Local Buzzer Alarm** | Active Buzzer | Motion / Proximity |
+
+---
 
 ## 🛠️ Hardware Requirements
-* **Microcontroller:** Arduino Uno (ATmega328P)
-* **Sensors:**
-    * PIR Motion Sensor (HC-SR501)
-    * Ultrasonic Sensor (HC-SR04)
-    * DHT11 Temperature & Humidity Sensor
-* **Output:** Active Buzzer
-* **Connectivity:** USB Cable (Type A to B) for Serial Communication
-* **Components:** Breadboard, Jumper Wires (M-M, M-F)
+- Arduino Uno (ATmega328P)
+- HC-SR04 Ultrasonic Sensor
+- HC-SR501 PIR Motion Sensor
+- DHT11 Temperature & Humidity Sensor
+- Active Buzzer
+- Breadboard + Jumper Wires
+- USB Type-A to Type-B cable (Arduino ↔ PC)
+
+---
 
 ## 🔌 Pin Connections
-| Component | Pin Name | Arduino Pin | Description |
-| :--- | :--- | :--- | :--- |
-| **Ultrasonic (HC-SR04)** | TRIG | D9 | Triggers ultrasonic pulse |
-| | ECHO | D10 | Receives reflected pulse |
-| | VCC/GND | 5V/GND | Power |
-| **PIR Sensor** | OUT | D2 | Sends HIGH signal on motion |
-| **DHT11 Sensor** | DATA | D7 | Sends temp/humidity data |
-| **Buzzer** | POS (+) | D8 | Active High to trigger sound |
+| Component | Pin | Arduino Pin |
+|---|---|---|
+| HC-SR04 | TRIG | D9 |
+| HC-SR04 | ECHO | D10 |
+| PIR Sensor | OUT | D2 |
+| DHT11 | DATA | D7 |
+| Active Buzzer | (+) | D8 |
+| All sensors | VCC / GND | 5V / GND |
 
-> **Note:** Pin assignments in the code must match this table.
+---
 
 ## 💻 Software Stack
-1.  **Arduino IDE:** Used for programming the microcontroller logic (C/C++).
-2.  **Python:** Runs on the host computer to read Serial data and interface with the Telegram API.
-3.  **Telegram Bot API:** Handles message delivery to the user's device.
+- **Arduino IDE** — uploads the `.ino` sketch to the board
+- **Python 3.x** — bridges Serial data → Telegram API
+- **Telegram Bot API** — delivers real-time alerts to your phone
 
-### Python Libraries Required
+### Python Dependencies
 ```bash
 pip install pyserial requests
 ```
 
-## 🚀 Installation & Setup
+---
 
-### 1. Hardware Assembly
+## 🚀 Setup & Usage
 
-Connect the components to the Arduino Uno using the breadboard as per the **Pin Connections** table above.
+### 1 · Hardware
+Wire all components to the Arduino Uno as per the pin table above.
 
-### 2. Arduino Setup
+### 2 · Arduino Sketch
+1. Open **`security_system.ino`** in the Arduino IDE.
+2. Install the **DHT sensor library** (by Adafruit) via the Library Manager.
+3. Select **Board → Arduino Uno** and the correct **COM port**.
+4. Upload the sketch.
 
-1. Open the Arduino IDE.
-2. Install the required libraries: `NewPing` (for Ultrasonic) and `DHT Sensor Library`.
-3. Upload the `.ino` sketch to the board. The code should continuously monitor sensors and print status messages to the Serial Monitor (e.g., "Motion Detected").
-
-### 3. Telegram Bot Setup
-
-1. Open Telegram and search for **BotFather**.
-2. Create a new bot (`/newbot`) and save the **API Token**.
-3. Get your **Chat ID** (you can use a bot like `@userinfobot`).
-
-### 4. Python Script
-
-1. Update the Python script with your `COM_PORT` (e.g., COM3 or /dev/ttyUSB0), `BOT_TOKEN`, and `CHAT_ID`.
-2. Run the script:
-```bash
-python telegram_alert.py
+**Expected Serial Monitor output (9600 baud):**
 ```
-3. The script will listen to the Arduino via Serial. When the Arduino detects an intrusion, the Python script triggers the Telegram API to send a message.
+Hello! The system is activated and everything is normal.
+Distance: 2272 cm  Temp: 33.70 °C  Humidity: 57.00 %
+🔥 Warning: High temperature detected!
+⚠ Motion detected! Be cautious.
+🔔 Object detected within 10 cm!
+```
+
+### 3 · Telegram Bot
+1. Open Telegram → search **@BotFather** → `/newbot` → copy the **API Token**.
+2. Search **@userinfobot** → copy your **Chat ID**.
+
+### 4 · Python Script
+1. Open **`telegram_alert.py`** and fill in:
+   ```python
+   SERIAL_PORT = 'COM10'          # your Arduino port
+   BOT_TOKEN   = 'YOUR_TOKEN'
+   CHAT_ID     = 'YOUR_CHAT_ID'
+   ```
+2. Run:
+   ```bash
+   python telegram_alert.py
+   ```
+
+**Telegram bot messages sent:**
+```
+👋 Hello! Smart Security System is ACTIVE and monitoring in real-time...
+ℹ️ Hello! The system is activated and everything is normal.
+🟩 Distance: 2271 cm  Temp: 33.60 °C  Humidity: 56.00 %
+🔥 Warning: High temperature detected!
+🔴 Motion detected! Someone might be nearby.
+🔴 ALERT: Object too close to the sensor!
+```
+
+---
 
 ## 🔮 Future Scope
+- Replace USB Serial with **ESP8266/ESP32** for wireless operation
+- Add **ESP32-CAM** to send photo snapshots on intrusion
+- Build a dedicated **mobile app** (Flutter / React Native)
+- Use **ML** to reduce false positives
 
-* **Wireless Integration:** Replace USB Serial with ESP8266/ESP32 for Wi-Fi capability.
-* **Camera Module:** Integrate ESP32-CAM to send photo evidence of intrusions.
-* **Mobile App:** Develop a dedicated Flutter/React Native app for control.
-* **AI Integration:** Use Machine Learning to reduce false positives.
+---
 
 ## 👥 Contributors
-
-* **Neha Santosh Yadav**
-* **Kartikey Umesh Tiwari**
-* **Ujjwal Suneel Tiwari**
-* *Guide:* Mrs. Rashmi Maheshwari
+- **Neha Santosh Yadav**
+- **Kartikey Umesh Tiwari**
+- **Ujjwal Suneel Tiwari**
+- *Guide:* Mrs. Rashmi Maheshwari

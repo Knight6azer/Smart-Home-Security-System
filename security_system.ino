@@ -1,17 +1,16 @@
 /*
-  Security Alarm System with Alerts
-  Monitors PIR Motion Sensor, Ultrasonic Sensor, and DHT11.
-  Triggers a Buzzer and sends Serial alerts for Python integration.
-  
+  Smart Home Security System
+  Monitors PIR Motion Sensor, Ultrasonic Sensor (HC-SR04), and DHT11.
+  Triggers a Buzzer and sends structured Serial messages for Python/Telegram integration.
+
   Pin Connections:
-  - Ultrasonic TRIG: D9
-  - Ultrasonic ECHO: D10
-  - PIR Sensor: D2
-  - DHT11 Data: D7
-  - Buzzer (+): D8
+  - Ultrasonic TRIG : D9
+  - Ultrasonic ECHO : D10
+  - PIR Sensor      : D2
+  - DHT11 Data      : D7
+  - Buzzer (+)      : D8
 */
 
-#include <NewPing.h>
 #include <DHT.h>
 
 // --- Pin Definitions ---
@@ -22,80 +21,94 @@
 #define BUZZER_PIN   8
 
 // --- Constants & Configuration ---
-#define MAX_DISTANCE 200     // Maximum distance we want to ping for (in cm). Maximum sensor distance is rated at 400-500cm.
 #define ALERT_DISTANCE 10    // Distance in cm to trigger proximity alert
-#define DHT_TYPE DHT11       // DHT 11
+#define TEMP_THRESHOLD 33.0  // Temperature threshold (°C) to trigger heat warning
+#define DHT_TYPE DHT11
 
-// --- Objects ---
-NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
+// --- Sensor Object ---
 DHT dht(DHT_PIN, DHT_TYPE);
 
-// --- Variables ---
-unsigned long lastTempRead = 0;
-const long intervalTemp = 2000; // Read temp every 2 seconds
+// --- Timing Variables ---
+unsigned long lastReadTime   = 0;
+const long    readInterval   = 1000; // Print sensor data every 1 second
+
+// --- Helper: Measure distance using HC-SR04 (no library) ---
+long measureDistance() {
+  digitalWrite(TRIGGER_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIGGER_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIGGER_PIN, LOW);
+
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000); // 30 ms timeout (~500 cm)
+  long distance = duration / 58;                  // convert to cm
+  return distance;
+}
 
 void setup() {
-  Serial.begin(9600); // Initialize Serial for Python communication
-  
-  pinMode(PIR_PIN, INPUT);
-  pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, LOW); // Ensure buzzer is off initially
-  
+  Serial.begin(9600);
+
+  pinMode(TRIGGER_PIN, OUTPUT);
+  pinMode(ECHO_PIN,    INPUT);
+  pinMode(PIR_PIN,     INPUT);
+  pinMode(BUZZER_PIN,  OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+
   dht.begin();
-  
-  Serial.println("System Initialized...");
-  delay(2000); // Allow sensors to stabilize
+  delay(2000); // Allow sensors to stabilise
+
+  Serial.println("Hello! The system is activated and everything is normal.");
 }
 
 void loop() {
-  // 1. Motion Detection (PIR)
-  int pirState = digitalRead(PIR_PIN);
-  if (pirState == HIGH) {
-    digitalWrite(BUZZER_PIN, HIGH);
-    Serial.println("ALERT: Motion Detected!");
-    delay(1000); // Keep buzzer on for a bit and avoid spamming
-  } else {
-    digitalWrite(BUZZER_PIN, LOW);
-  }
-
-  // 2. Proximity Detection (Ultrasonic)
-  unsigned int uS = sonar.ping(); 
-  int distance = uS / US_ROUNDTRIP_CM; // Convert ping time to distance in cm
-  
-  // filtering out 0 which often means out of range or error
-  if (distance > 0 && distance < ALERT_DISTANCE) {
-    digitalWrite(BUZZER_PIN, HIGH);
-    Serial.print("ALERT: Proximity Breach! Distance: ");
-    Serial.print(distance);
-    Serial.println("cm");
-    delay(500); // Beep duration
-  }
-  // Note: If PIR is LOW but Ultrasonic is HIGH, buzzer goes LOW then HIGH quickly, creating a different pattern or sustaining the sound if loop is fast.
-  
-  // 3. Environmental Monitoring (DHT11)
   unsigned long currentMillis = millis();
-  if (currentMillis - lastTempRead >= intervalTemp) {
-    lastTempRead = currentMillis;
-    
-    float h = dht.readHumidity();
-    float t = dht.readTemperature(); // Celsius
 
-    if (isnan(h) || isnan(t)) {
-      Serial.println("Error reading from DHT sensor!");
+  if (currentMillis - lastReadTime >= readInterval) {
+    lastReadTime = currentMillis;
+
+    // --- 1. Read DHT11 ---
+    float humidity    = dht.readHumidity();
+    float temperature = dht.readTemperature();
+
+    // --- 2. Read Ultrasonic ---
+    long distance = measureDistance();
+
+    // --- 3. Read PIR ---
+    int pirState = digitalRead(PIR_PIN);
+
+    // --- 4. Print main data line ---
+    if (!isnan(humidity) && !isnan(temperature)) {
+      Serial.print("Distance: ");
+      Serial.print(distance);
+      Serial.print(" cm  Temp: ");
+      Serial.print(temperature, 2);
+      Serial.print(" \xB0");   // degree symbol
+      Serial.print("C  Humidity: ");
+      Serial.print(humidity, 2);
+      Serial.println(" %");
     } else {
-      Serial.print("ENV: Humidity: ");
-      Serial.print(h);
-      Serial.print("%, Temp: ");
-      Serial.print(t);
-      Serial.println("C");
-      
-      // Optional: Add simple fire hazard check (e.g., Temp > 50C)
-      if (t > 50) {
-         digitalWrite(BUZZER_PIN, HIGH);
-         Serial.println("ALERT: High Temperature Detected!");
-      }
+      Serial.println("Error: DHT sensor read failed!");
+    }
+
+    // --- 5. PIR Alert ---
+    if (pirState == HIGH) {
+      Serial.println("⚠ Motion detected! Be cautious.");
+      digitalWrite(BUZZER_PIN, HIGH);
+      delay(500);
+      digitalWrite(BUZZER_PIN, LOW);
+    }
+
+    // --- 6. Temperature Alert ---
+    if (!isnan(temperature) && temperature > TEMP_THRESHOLD) {
+      Serial.println("🔥 Warning: High temperature detected!");
+    }
+
+    // --- 7. Proximity Alert ---
+    if (distance > 0 && distance < ALERT_DISTANCE) {
+      Serial.println("🔔 Object detected within 10 cm!");
+      digitalWrite(BUZZER_PIN, HIGH);
+      delay(300);
+      digitalWrite(BUZZER_PIN, LOW);
     }
   }
-  
-  delay(100); // Small delay for stability
 }
